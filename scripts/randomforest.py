@@ -74,21 +74,25 @@ class RandomForest:
     
     
     def predict_with_location(self, X_df):
+        print("original X_df:", X_df)
+        print("in predict with location")
         points_df = X_df[X_df['Type'] == 'Point']
         # Assuming 'polygons_df' has been correctly filtered to include only polygon rows
         polygons_df = X_df[(X_df['Type'] == 'Polygon') | (X_df['group'].isin(X_df[X_df['Type'] == 'Polygon']['group'])) & (X_df['Type'] != 'Point')]
-
+        print({"points_df": points_df, "polygons_df": polygons_df})
+        
         for index, row in points_df.iterrows():
             latitude, longitude = row['Latitude'], row['Longitude']
             point = np.array([[longitude, latitude]])
             predictions = np.zeros((1, len(self.trees)))
             for i, (tree, features_indices) in enumerate(self.trees):
                 predictions[:, i] = tree.predict(point[:, features_indices])
-            final_prediction = mode(predictions, axis=1)[0].flatten()[0]
+            final_prediction = mode(predictions, axis=1)[0].flatten()[0] * 100
             X_df.at[index, 'Prediction'] = final_prediction
 
         grouped_polygons = polygons_df.groupby('group')
         for group_number, group_df in grouped_polygons:
+            print("in grouped polygons collision prediction")
             polygon_coords = [(x, y) for x, y in zip(group_df['Longitude'], group_df['Latitude'])]
             polygon = Polygon(polygon_coords)
             minx, miny, maxx, maxy = polygon.bounds
@@ -108,8 +112,9 @@ class RandomForest:
             # Update the prediction for this group in X_df
             if count > 0:
                 average_prediction = sumOfPredictions / count
+                average_prediction_percentage = average_prediction * 100
                 # Find rows belonging to this group and update
-                X_df.loc[X_df['group'] == group_number, 'Prediction'] = average_prediction
+                X_df.loc[X_df['group'] == group_number, 'Prediction'] = average_prediction_percentage
 
         return X_df
     
